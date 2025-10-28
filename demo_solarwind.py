@@ -90,6 +90,7 @@ if __name__ == "__main__":
     # Get MAG file names / load the MAG data
     mag_coord = 'pl'
 
+    # mag_coord, mag_ext, mag_res, mag_level = 'ss', 'sts', '1sec', 'l2'
     for mag_ext, mag_res, mag_level in zip(('sav', 'sav'), ('30sec', '1sec'), ('l2', 'l1')):
         if args.download:
             retrieve.sdc_retrieve(
@@ -107,10 +108,12 @@ if __name__ == "__main__":
         except IOError:
             continue
 
-        actual_mag_files = [i for i in mag_file_names if i]
+    actual_mag_files = [i for i in mag_file_names if i]
 
-        if len(actual_mag_files) != 0:
-            break
+    # if len(actual_mag_files) != 0:
+    #     break
+    # print(mag_ext, mag_res, mag_level)
+    # input()
 
     mag = load.load_data(
         mag_file_names, ext=mag_ext, res=mag_res,
@@ -120,6 +123,7 @@ if __name__ == "__main__":
     bx = mag["Bx"][0]
     by = mag["By"][0]
     bz = mag["Bz"][0]
+    bmag = np.sqrt(bx**2 + by**2 + bz**2)
 
     # Rotate from payload to MSO coordinates:
     b_mso = spice.bpl_to_bmso(mag_epoch, bx, by, bz)
@@ -178,6 +182,7 @@ if __name__ == "__main__":
     # SWIA moment plot
     ax[0].plot(swia_epoch, n, color='b')
     ax[0].set_ylabel("n, {}".format(n_unit), color='b')
+    ax[0].set_yscale('log')
     ax_v = ax[0].twinx()
     ax_v.plot(swia_epoch, v_m, color='r')
     ax_v.set_ylabel("Velocity, km/s", color='r')
@@ -186,8 +191,10 @@ if __name__ == "__main__":
     ax[1].plot(mag_epoch, bx, color='b', label='Bx')
     ax[1].plot(mag_epoch, by, color='g', label='By')
     ax[1].plot(mag_epoch, bz, color='r', label='Bz')
+    ax[1].plot(mag_epoch, bmag, color='k', label='|B|')
     ax[1].axhline(0, color='gray', linestyle='--')
     ax[1].set_ylabel("B, nT")
+    ax[1].set_ylim([-50, 50])
     ax[1].legend()
 
     # SWEA plot
