@@ -148,6 +148,26 @@ def invert_energy_axis(data_dict, energy_names=None,
     return data_dict
 
 
+def datetime64_to_datetime(utc_time_dt64):
+
+    '''Function to convert a numpy datetime64 object
+    into a datetime object.
+    Since astype sometimes returns a nonsense value, usually an integer,
+    need to do a str parse to work around.'''
+
+    # utc_time_dt64 = utc_time_dt64.tolist()
+    UTC_time_dt = utc_time_dt64.astype(dt.datetime)
+    if isinstance(UTC_time_dt, int):
+        UTC_time_str = np.datetime_as_string(utc_time_dt64)
+        # Ex: 2023-12-08T00:00:02.431755776
+        # cut off any sub-microsecond precision:
+        UTC_time_dt = dt.datetime.strptime(
+            UTC_time_str[:26], "%Y-%m-%dT%H:%M:%S.%f")
+        # print(UTC_time_asdt)
+
+    return UTC_time_dt
+
+
 def UNX_to_UTC(POSIX_time):
     """Convert a numpy array of POSIX times into a
     numpy array of datetime objects.
@@ -189,21 +209,7 @@ def UTC_to_UNX(UTC_time):
 
     # If supplied as np.datetime64, convert to datetime obj:
     if isinstance(UTC_time, np.datetime64):
-        # UTC_time = UTC_time.tolist()
-        # PROBLEM: astype sometimes returns a nonsense value, usually an integer,
-        # so do a str parse to work around
-        UTC_time_asdt = UTC_time.astype(dt.datetime)
-        if isinstance(UTC_time_asdt, int):
-            UTC_time_asstr = np.datetime_as_string(UTC_time)
-            # Ex: 2023-12-08T00:00:02.431755776
-            # cut off any sub-microsecond precision:
-            UTC_time_asdt = dt.datetime.strptime(
-                UTC_time_asstr[:26], "%Y-%m-%dT%H:%M:%S.%f")
-            # print(UTC_time_asdt)
-
-        UTC_time = UTC_time_asdt
-
-
+        UTC_time = datetime64_to_datetime(UTC_time)
     # print(UTC_time)
 
     if UTC_time.tzinfo is None:
@@ -292,7 +298,10 @@ def date_to_dt(date, default=None):
         date_dt = parse(date, default=dt.datetime(2015, 1, 1))
     elif isinstance(date, np.datetime64) or\
             np.issubdtype(date, np.datetime64):
-        date_dt = date.astype(dt.datetime)
+        # Now uses datetime64 conversion here,
+        # needed since astype can sometimes return
+        # an int.
+        date_dt = datetime64_to_datetime(date)
     elif date is None and default is not None:
         default_dt = date_to_dt(default)
         date_dt = default_dt
@@ -332,28 +341,82 @@ def sanitize_date_inputs(start_date=None, n_days=None, end_date=None,
     return start_date, n_days, end_date
 
 
-def make_dt_range(start_date, n_points_per_day=2,
-                  n_days=None, end_date=None):
+def dt_range(start_date, n_days=None, end_date=None,
+             cadence=None, cadence_unit=None,
+             n_points_per_day=None):
+    '''
+    n_points_per_day: ex. 2
+    '''
+
+    # Need either a cadence + cadence_unit OR
+    # a n_points_per_day
+    if not cadence and not n_points_per_day:
+        raise ValueError(
+            "make_dt_range needs either a cadence (e.g. 1) "
+            "and cadence_unit (e.g. 'hr') OR a n_points_per_day"
+            " (e.g. 2). Neither supplied.")
+    if cadence and not cadence_unit:
+        raise ValueError(
+            "If supplying a cadence, make_dt_range needs a "
+            "cadence_unit (e.g. 'hr').")
 
     # Convert start/end/n_days to appropriate datetype
     start_date_dt, n_days, end_date_dt = sanitize_date_inputs(
         start_date=start_date, n_days=n_days, end_date=end_date,
         default_start_date=None, default_end_date=None)
 
-    # Old:
-    # N = n_points_per_day * n_days
-    # dt_range =\
-    #     [n_days * dt.timedelta(days=i) / N + start_date_dt
-    #      for i in range(N + 1)]
+    # Step through time until reach the end_date:
+    if cadence:
 
-    delta_t =\
-        [dt.timedelta(days=1)*i/n_points_per_day for i
-         in range(n_points_per_day)]
-    days = [start_date_dt + dt.timedelta(days=i) for i in range(n_days)]
+        # Set start:
+        t_i_utc = start_date_dt
+        t = [start_date_dt]
 
-    dt_range = [(i + j) for (i, j) in itertools.product(days, delta_t)]
+        # For minute/hour/second
+        if cadence_unit in ("min", "hr", "s"):
+            if cadence_unit == 'min':
+                duration_s = cadence*60
+            elif cadence_unit == 'hr':
+                duration_s = cadence*60*60
+            elif cadence_unit == 's':
+                duration_s = cadence
 
-    return dt_range
+            # Use timedelta seconds argument:
+            while t_i_utc < end_date_dt:
+                t_i_utc = t_i_utc + dt.timedelta(seconds=duration_s)
+                t.append(t_i_utc)
+
+        elif cadence_unit in ("day", "weeks", "year"):
+            if cadence_unit == 'year':
+                duration_d = cadence*365
+            elif cadence_unit == 'days':
+                duration_d = cadence
+            elif cadence_unit == 'weeks':
+                duration_d = cadence*7
+
+            # Use timedelta seconds argument:
+            while t_i_utc < end_date_dt:
+                t_i_utc = t_i_utc + dt.timedelta(days=duration_d)
+                t.append(t_i_utc)
+
+    if n_points_per_day:
+        # Old:
+        # N = n_points_per_day * n_days
+        # dt_range =\
+        #     [n_days * dt.timedelta(days=i) / N + start_date_dt
+        #      for i in range(N + 1)]
+
+        delta_t =\
+            [dt.timedelta(days=1)*i/n_points_per_day for i
+             in range(n_points_per_day)]
+        days = [start_date_dt + dt.timedelta(days=i) for i in range(n_days)]
+
+        t = []
+        for (i, j) in itertools.product(days, delta_t):
+            t.append(i + j)
+        # dt_range = [(i + j) ]
+
+    return t
 
 
 def find_closest_index(array, value):
