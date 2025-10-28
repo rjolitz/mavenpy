@@ -1017,53 +1017,6 @@ def MAVEN_position(t_i, frame="MAVEN_MSO"):
     return x, y, z
 
 
-def sep_mso_look_dir(time_UTC, sensor_number, look_direction):
-    """Rotate the look direction of a given MAVEN SEP sensor
-    into MSO coordinates."""
-
-    # # get ephemeris time:
-    # ephemeris_time = dt_to_et(time_UTC)
-    # N = len(ephemeris_time)
-
-    look_direction = look_direction.lower()[:1]
-
-    if look_direction == "f":
-        fov_x = 1
-    elif look_direction == "r":
-        fov_x = -1
-    else:
-        raise ValueError(
-            "Look direction '{}' not recognized, "
-            "use 'r' or 'f' instead.".format(look_direction))
-
-    sep_mso = pxform(
-        time_UTC, fov_x, 0, 0,
-        "MAVEN_SEP{}".format(sensor_number),
-        "MAVEN_MSO")
-
-    # # initialize 3D matrix to fill in:
-    # sep_mso = np.zeros(shape=(N, 3))
-
-    # for i, et in enumerate(ephemeris_time):
-    #     frame = "MAVEN_SEP{}".format(sensor_number)
-
-    #     try:
-    #         m = spiceypy.pxform(frame, "MAVEN_MSO", et)
-    #     except spiceypy.utils.support_types.SpiceyError:
-    #         sep_mso.append([np.nan, np.nan, np.nan])
-    #         continue
-
-    #     q = spiceypy.m2q(m)
-    #     # print(q)
-    #     sep_x_mso, sep_y_mso, sep_z_mso = quaternion_rotation(
-    #         q, sep_frame_pointing)
-    #     # print(sep_x_mso, sep_y_mso, sep_z_mso)
-    #     sep_mso[i, :] = sep_x_mso, sep_y_mso, sep_z_mso
-    #     # input()
-
-    return sep_mso
-
-
 def bpl_to_bmso(time_UTC, bx_pl, by_pl, bz_pl):
     """Rotate the measured B from MAVEN MAG from payload coordinates
     into MSO coordinates."""
@@ -1170,11 +1123,11 @@ def load_MAVEN_position(start_date, n_days=None, end_date=None,
     """
 
     # Get start date, n_days, end_date
-    if end_date is None:
-        start_date, n_days, end_date = helper.sanitize_date_inputs(
-            start_date=start_date, n_days=n_days, end_date=end_date)
+    # if end_date is None:
+    start_date, n_days, end_date = helper.sanitize_date_inputs(
+        start_date=start_date, n_days=n_days, end_date=end_date)
 
-    sc_time_utc = helper.make_dt_range(
+    sc_time_utc = helper.dt_range(
         start_date, end_date=end_date, n_points_per_day=n_sample_points)
 
     x, y, z = MAVEN_position(sc_time_utc, frame=frame)
@@ -1196,7 +1149,7 @@ def local_solar_time(start_date, n_days=None, end_date=None,
         start_date, n_days, end_date = helper.sanitize_date_inputs(
             start_date=start_date, n_days=n_days, end_date=end_date)
 
-    sc_time_utc = helper.make_dt_range(
+    sc_time_utc = helper.dt_range(
         start_date, end_date=end_date, n_points_per_day=n_sample_points)
     et = dt_to_et(sc_time_utc)
 
