@@ -292,58 +292,58 @@ def curve_fitted_N_T(energy_eV, d_energy_eV, diff_en_flux_eVcm2eVsters,
     guess_T = Emax / 2
     guess_N = Fmax / (4 * c1 * c2 * np.sqrt(guess_T) * np.exp(V / guess_T - 2))
 
-    from matplotlib import pyplot as plt
+    # from matplotlib import pyplot as plt
+    # # plt.figure()
+    # # plt.plot(np.linspace(1, N, N), Emax)
+    # # plt.yscale('log')
+    # # plt.show()
+
+    # i = 0
+    # V_i = V[i]
+    # F_i = F[0, :]
+    # f.V = V_i
+    # Elo = min(0.8 * Emax[i], max(V_i, 0.5 * Emax[i]))
+    # Ehi = 3 * Emax[i]
+    # core_indices = np.where((E > Elo) & (E < Ehi))[0]
+    # E_core = E[core_indices]
+    # F_core = F_i[core_indices]
+    # # (N_core_fit_i, T_core_fit_i), _ = curve_fit(
+    # #     f.maxwell_boltzmann_eflux, E_core, F_core,
+    # #     p0=(guess_N[i], guess_T[i]),
+    # #     nan_policy='omit')
+    # # print(N_core_fit_i, T_core_fit_i)
+
+    # E_min = np.min([0.8 * Emax, np.max([V, 0.5 * Emax], axis=0)], axis=0)
+    # core = (E[np.newaxis, :] > E_min[:, np.newaxis]) & (E[np.newaxis, :] < 3*Emax[:, np.newaxis])
+    # # E_core = np.where(core, E, np.nan)
+    # E_core = E[np.newaxis, :]
+    # # E_core = E
+    # F_core = np.where(core, F, np.nan)
+
     # plt.figure()
-    # plt.plot(np.linspace(1, N, N), Emax)
+    # plt.pcolormesh(np.linspace(1, N, N), E, F_core.T)
     # plt.yscale('log')
     # plt.show()
 
-    i = 0
-    V_i = V[i]
-    F_i = F[0, :]
-    f.V = V_i
-    Elo = min(0.8 * Emax[i], max(V_i, 0.5 * Emax[i]))
-    Ehi = 3 * Emax[i]
-    core_indices = np.where((E > Elo) & (E < Ehi))[0]
-    E_core = E[core_indices]
-    F_core = F_i[core_indices]
-    # (N_core_fit_i, T_core_fit_i), _ = curve_fit(
+    # print(E_core.shape, F_core.shape, guess_T.shape, guess_N.shape)
+
+    # # Remove all-NaN columns:
+    # not_allnan = ~np.all(np.isnan(F_core), axis=1)
+    # print(not_allnan.shape)
+
+    # F_core = F_core[not_allnan, :]
+    # guess_N = guess_N[not_allnan]
+    # guess_T = guess_T[not_allnan]
+
+    # print(E_core.shape, F_core.shape, guess_T.shape, guess_N.shape)
+    # print("Run curvefit")
+    # (N_core_fit, T_core_fit), _ = curve_fit(
     #     f.maxwell_boltzmann_eflux, E_core, F_core,
-    #     p0=(guess_N[i], guess_T[i]),
+    #     p0=(guess_N, guess_T),
     #     nan_policy='omit')
-    # print(N_core_fit_i, T_core_fit_i)
+    # print(N_core_fit.shape, T_core_fit.shape)
 
-    E_min = np.min([0.8 * Emax, np.max([V, 0.5 * Emax], axis=0)], axis=0)
-    core = (E[np.newaxis, :] > E_min[:, np.newaxis]) & (E[np.newaxis, :] < 3*Emax[:, np.newaxis])
-    # E_core = np.where(core, E, np.nan)
-    E_core = E[np.newaxis, :]
-    # E_core = E
-    F_core = np.where(core, F, np.nan)
-
-    plt.figure()
-    plt.pcolormesh(np.linspace(1, N, N), E, F_core.T)
-    plt.yscale('log')
-    plt.show()
-
-    print(E_core.shape, F_core.shape, guess_T.shape, guess_N.shape)
-
-    # Remove all-NaN columns:
-    not_allnan = ~np.all(np.isnan(F_core), axis=1)
-    print(not_allnan.shape)
-
-    F_core = F_core[not_allnan, :]
-    guess_N = guess_N[not_allnan]
-    guess_T = guess_T[not_allnan]
-
-    print(E_core.shape, F_core.shape, guess_T.shape, guess_N.shape)
-    print("Run curvefit")
-    (N_core_fit, T_core_fit), _ = curve_fit(
-        f.maxwell_boltzmann_eflux, E_core, F_core,
-        p0=(guess_N, guess_T),
-        nan_policy='omit')
-    print(N_core_fit.shape, T_core_fit.shape)
-
-    input()
+    # input()
 
 
     # initialize empty arrays to store solutions
@@ -478,6 +478,8 @@ def curve_fitted_N_T(energy_eV, d_energy_eV, diff_en_flux_eVcm2eVsters,
         N_halo_moment[i] = N_halo_moment_i
         T_halo_moment[i] = T_halo_moment_i
 
+        # if N_core_fit_i > 1e4:
+        # if i > 3e4:
         if plot_fits:
             N_all, T_all = moment_N_T(E, d_energy_eV, F_i, mass_eVkm2s2, sc_potential_V=0)
             print(
@@ -523,6 +525,7 @@ def curve_fitted_N_T(energy_eV, d_energy_eV, diff_en_flux_eVcm2eVsters,
             F_halo_fit_curvefit_i = f.kappa_eflux(E, v_halo_fit_i, N_halo_fit_i)
 
             from matplotlib import pyplot as plt
+            from matplotlib.colors import LogNorm
 
             fig, ax = plt.subplots()
             ax.plot(E, F_i, label="raw spectra")
@@ -547,6 +550,15 @@ def curve_fitted_N_T(energy_eV, d_energy_eV, diff_en_flux_eVcm2eVsters,
             # plt.gca().axvline(Elo)
             # plt.gca().axvline(Ehi)
             # plt.gca().axvline(2*Emax)
+
+            fig, ax = plt.subplots()
+            time_i = np.linspace(0, N - 1, N)
+            ax.pcolormesh(time_i, E, diff_en_flux_eVcm2eVsters.T, norm=LogNorm())
+            ax.set_yscale('log')
+            ax.scatter(time_i, V, color='r')
+            ax.axvline(time_i[i], color='k')
+
+
             plt.show()
 
     return (
