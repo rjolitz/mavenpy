@@ -444,7 +444,7 @@ if __name__ == "__main__":
                 download_if_not_available=dl_kernels)
             input("Loaded ephemeris, hit return to continue:")
 
-            sc_time_utc = helper.make_dt_range(
+            sc_time_utc = helper.dt_range(
                 start, end_date=end, n_days=n_days,
                 n_points_per_day=1000)
 
