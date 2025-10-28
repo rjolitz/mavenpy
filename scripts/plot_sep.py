@@ -416,7 +416,7 @@ if __name__ == "__main__":
                 else:
                     flux = sep_i["{}_{}".format(data_label_i, output_data_units)]
 
-                # print(flux.shape, epoch_i.shape, energy.shape)
+                print(flux.shape, epoch_i.shape, energy.shape)
 
                 ylabel_i = "SEP {}{} {}\nEnergy [keV]".format(
                     sensor_i, name_y_i, name_x_i)
@@ -472,8 +472,12 @@ if __name__ == "__main__":
             ax_atten.pcolormesh(
                 epoch_i, [0, 1], [att_i, att_i],
                 cmap=ListedColormap(['b', 'r']), norm=Normalize(vmin=1, vmax=2))
-            ax_atten.yaxis.set_visible(False)
-            ax_atten.set_yticks([], minor=True)
+            # ax_atten.yaxis.set_visible(False)
+            # ax_atten.set_yticks([], minor=True)
+            ax_atten.tick_params(axis='y', which='both', left=False, labelleft=False)
+            ax_atten.set_ylabel(
+                "Atten.", rotation='horizontal',
+                va='center', labelpad=35)
     # fig.autofmt_xdate()
     # ax[0].xaxis.set_minor_locator(mdates.MinuteLocator(byminute=[30,]))
     import matplotlib.dates as mdates
@@ -481,7 +485,7 @@ if __name__ == "__main__":
 
     # ax[0].xaxis.set_major_locator(mdates.HourLocator(byhour=[0, 12,]))
     # ax[0].xaxis.set_minor_locator(mdates.HourLocator(byhour=[0, 4, 8, 12, 16, 20]))
-    ax[0].xaxis.set_major_formatter(mdates.DateFormatter('%m-%d\n%H:%M'))
+    ax[0].xaxis.set_major_formatter(mdates.DateFormatter('%m-%d\n%H:%M:%S'))
 
     # if start_date == end_date:
     if not args.xlim:
