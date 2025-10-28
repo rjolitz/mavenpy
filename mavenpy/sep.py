@@ -308,8 +308,16 @@ def read_raw(filename, lib='cdflib', level='None',
     # Scrub the NaNs for the time axis of each
     # dataset (as they have different commanding
     # times).
+    # print(filename)
     for i in raw_data:
         raw_data_i = raw_data[i]
+
+        if not isinstance(raw_data_i, dict):
+            # If there's no telemetry,
+            # the raw data will be an integer (0).
+            # In this case, cannot preprocess anything:
+            continue
+
         ctime_unx = raw_data_i[time_var_name]
         non_nan_index = (~np.isnan(ctime_unx))
         raw_data_i = process_data_dict(
@@ -351,6 +359,13 @@ def read_raw(filename, lib='cdflib', level='None',
         raw_data_i = raw_data[i]
         # print(i, raw_data_i.keys())
         # continue
+
+        if not isinstance(raw_data_i, dict):
+            # If there's no telemetry,
+            # the raw data will be an integer (0).
+            # In this case, want to return nothing:
+            data_dict[i] = {}
+            continue
 
         # Iterate through the named categories in each sensor file:
         data_dict_i = {}
