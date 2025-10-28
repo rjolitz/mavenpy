@@ -325,7 +325,7 @@ def p(energy_eV, d_energy_eV, diff_en_flux_eVcm2eVsters, species,
       phi_deg=None, dphi_deg=None, theta_deg=None, dtheta_deg=None,
       theta_ax=None, N=None, diagonal_only=False,
       diagonalize_axis=None):
-    '''Adaptation of p_3d_new.pro'''
+    '''Pressure tensor, adaptation of p_3d_new.pro'''
 
     # Get the mass:
     mass_eVkm2s2 = constants.mass[species]
@@ -425,7 +425,7 @@ def p(energy_eV, d_energy_eV, diff_en_flux_eVcm2eVsters, species,
 def T(energy_eV, d_energy_eV, diff_en_flux_eVcm2eVsters, species,
       phi_deg=None, dphi_deg=None, theta_deg=None, dtheta_deg=None,
       theta_ax=None, N=None, diagonalize_axis=None):
-    '''Adaptation of p_3d_new.pro'''
+    '''Temperature vector, adaptation of T_3d_new.pro'''
 
     # Get the density (cm-3) if not provided
     if N is None:
@@ -453,7 +453,9 @@ def T(energy_eV, d_energy_eV, diff_en_flux_eVcm2eVsters, species,
 def H_alpha_moments(energy_eV, d_energy_eV, diff_en_flux_eVcm2eVsters,
                     phi_deg=None, dphi_deg=None,
                     theta_deg=None, dtheta_deg=None, theta_ax=None,
-                    N=None, V=None):
+                    N=None, V=None, debug_plots=False):
+
+    '''Adaptation of mvn_swia_protonalphamoms_minf.pro'''
 
     # First, get the moments assuming everything is protons:
     if N is None or V is None:
@@ -467,9 +469,9 @@ def H_alpha_moments(energy_eV, d_energy_eV, diff_en_flux_eVcm2eVsters,
     # corresponds to:
     v_mag = np.sqrt(np.sum(V**2, axis=0))
     E = units.energy(v_mag, name='H+')
-    E_cut = 1.5 * E
 
-    # Calculate espec:
+    # Sum over all angle bins to get the differential
+    # energy flux (d(EF)/dEdS -> d(EF)/dE):
     eflux_shape = diff_en_flux_eVcm2eVsters.shape
     sum_axis = tuple(
         [i for i, j in enumerate(eflux_shape) if
@@ -483,33 +485,50 @@ def H_alpha_moments(energy_eV, d_energy_eV, diff_en_flux_eVcm2eVsters,
     # print(espec.shape)
 
     # Mark indices where we can seek a different Ecut:
+    E = energy_eV[np.argmax(espec, axis=1)]
+    E_cut = 1.5 * E
     E_l = 1.15 * E
     E_h = 2 * E
 
-    inspect = np.where((energy_eV[-2] > E_l) & (energy_eV[2] < E_h))[0]
+    # inspect = np.where((energy_eV[-2] > E_l) & (energy_eV[2] < E_h))[0]
+    inspect = np.where((energy_eV[-1] > E_l) & (energy_eV[0] < E_h))[0]
     # print(inspect.shape)
 
     for j in inspect:
         # This section working pretty well (subset)
         espec_j = espec[j, :]
         subset_j = np.where((energy_eV > E_l[j]) & (energy_eV < E_h[j]))[0]
+        # print(espec_j[subset_j])
 
-        dEF_dE = np.gradient(espec_j[subset_j], energy_eV[subset_j])
-        # print(dEF_dE)
+        # # Jasper's algo: identify dEF/de > 0 (inc) and sign of inc
+        # dEF_dE = np.gradient(espec_j[subset_j], energy_eV[subset_j])
+        # # cross = dEF_dE[:-1] * dEF_dE[1:]
+        # cross = np.roll(dEF_dE, 1) * dEF_dE
+        # # inflection_point_j = np.where((cross < 0) & (dEF_dE[1:] > 0))[0]
+        # inflection_point_j = np.where((cross < 0) & (dEF_dE > 0))[0]
+        # if len(inflection_point_j) > 0:
+        #     # new_start_index = subset_j[0] + inflection_point_j[0] + 1
+        #     new_start_index = subset_j[0] + inflection_point_j[0]
+        #     new_E_cut = energy_eV[new_start_index]
+        #     # print(energy_eV[new_start_index], E_cut[j])
 
-        # cross = dEF_dE[:-1] * dEF_dE[1:]
-        cross = np.roll(dEF_dE, 1) * dEF_dE
-        # print(cross)
+        #     E_cut[j] = new_E_cut
 
-        # inflection_point_j = np.where((cross < 0) & (dEF_dE[1:] > 0))[0]
-        inflection_point_j = np.where((cross < 0) & (dEF_dE > 0))[0]
-        # print(inflection_point_j)
+        # Alt method: min?
+        inflection_point_j = np.argmin(espec_j[subset_j])
+        E_cut[j] = energy_eV[subset_j[0] + inflection_point_j]
 
-        if len(inflection_point_j) > 0:
-            # new_start_index = subset_j[0] + inflection_point_j[0] + 1
-            new_start_index = subset_j[0] + inflection_point_j[0]
-            new_E_cut = energy_eV[new_start_index]
-            # print(energy_eV[new_start_index], E_cut[j])
+        # fig, ax = plt.subplots()
+        # ax.plot(energy_eV, espec_j, color='gray')
+        # ax.plot(energy_eV[subset_j], espec_j[subset_j])
+        # # ax.plot(energy_eV[subset_j], dEF_dE, marker='x')
+        # # ax.plot(energy_eV[subset_j], cross, marker='x')
+        # ax.axvline((energy_eV[subset_j])[inflection_point_j], color='k')
+        # ax.axvline(E_l[j], color='b')
+        # ax.axvline(E_h[j], color='r')
+        # ax.set_yscale('log')
+        # ax.set_xscale('log')
+        # plt.show()
 
         # plt.figure()
         # plt.loglog(energy_eV, espec_j)
@@ -519,12 +538,43 @@ def H_alpha_moments(energy_eV, d_energy_eV, diff_en_flux_eVcm2eVsters,
         # plt.axvline(E_l[j], color='gray', linestyle='--')
         # plt.axvline(E_h[j], color='gray', linestyle='--')
         # plt.axvline(E_cut[j], color='salmon')
-        # plt.axvline(new_E_cut, color='r')
+        # if len(inflection_point_j) > 0:
+        #     plt.axvline(new_E_cut, color='b')
+        # else:
+        #     plt.axvline(E_cut[j], color='r')
         # plt.show()
-
-        E_cut[j] = new_E_cut
+        # print(subset_j)
 
         # input()
+
+    if debug_plots:
+        from matplotlib.colors import LogNorm
+        fig, ax = plt.subplots(nrows=3, ncols=3)
+
+        time_indices = [13870, 14010, 14250]
+        time_indices = [7431, 7670, 7807]
+        for i, time_index in enumerate(time_indices):
+            E_index = np.where(energy_eV <= E_cut[time_index])[0][-1]
+
+            for k, e_offset_index in enumerate([-1, 0, 1]):
+                j = E_index + e_offset_index
+                theta_deg_i = theta_deg[:, j]
+                print(eflux_shape)
+                Eflux_snapshot = diff_en_flux_eVcm2eVsters[time_index, :, :, j]
+                print(Eflux_snapshot.shape, phi_deg.shape, theta_deg.shape)
+                p = ax[i, k].pcolormesh(
+                    phi_deg, theta_deg_i, Eflux_snapshot.T,
+                    norm=LogNorm(vmin=1e5, vmax=1e8), cmap='plasma')
+                # ax[i, k].set_title("{} eV".format(energy_eV[j]))
+        # fig.colorbar(p, label='Eflux', ax=ax[-1])
+
+        fig, ax = plt.subplots()
+        time_utc = np.linspace(0, eflux_shape[0] - 1, eflux_shape[0])
+        p = ax.pcolormesh(
+            time_utc, energy_eV, espec.T,
+            norm=LogNorm(vmin=1e5, vmax=1e10), cmap='plasma')
+
+        plt.show()
 
     # Get the Helium flux by setting fluxes below the energy
     # cut to 0
@@ -537,7 +587,7 @@ def H_alpha_moments(energy_eV, d_energy_eV, diff_en_flux_eVcm2eVsters,
     He_d_energy_eV = 2*d_energy_eV
     He_name = 'He++'
 
-    # Get the moments:
+    # Get the moments, assuming the rest is He++
     He_n = n(
         He_energy_eV, He_d_energy_eV, He_eflux, He_name,
         phi_deg=phi_deg, dphi_deg=dphi_deg,
@@ -570,6 +620,27 @@ def H_alpha_moments(energy_eV, d_energy_eV, diff_en_flux_eVcm2eVsters,
         energy_eV, d_energy_eV, p_eflux, 'H+',
         phi_deg=phi_deg, dphi_deg=dphi_deg,
         theta_deg=theta_deg, dtheta_deg=dtheta_deg, N=p_n)
+
+    if debug_plots:
+        fig, ax = plt.subplots(nrows=3, sharey=True, sharex=True)
+        time_utc = np.linspace(0, eflux_shape[0] - 1, eflux_shape[0])
+        p = ax[0].pcolormesh(
+            time_utc, energy_eV, espec.T,
+            norm=LogNorm(vmin=1e5, vmax=1e10), cmap='plasma')
+        He_espec = np.sum(He_eflux*domega, axis=sum_axis) /\
+            np.sum(domega, axis=sum_axis)
+        p = ax[1].pcolormesh(
+            time_utc, energy_eV, He_espec.T,
+            norm=LogNorm(vmin=1e5, vmax=1e10), cmap='plasma')
+        p_espec = np.sum(p_eflux*domega, axis=sum_axis) /\
+            np.sum(domega, axis=sum_axis)
+        p = ax[2].pcolormesh(
+            time_utc, energy_eV, p_espec.T,
+            norm=LogNorm(vmin=1e5, vmax=1e10), cmap='plasma')
+        ax[0].set_yscale('log')
+        for ax_i in ax:
+            ax_i.plot(time_utc, E_cut, color='k')
+
 
     return p_n, p_v, p_T, He_n, He_v, He_T
 
