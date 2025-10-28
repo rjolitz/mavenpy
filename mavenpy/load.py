@@ -49,62 +49,86 @@ def load_data(maven_data_files, data_read_function=None,
 
         data_read_function = read_functions[tla]
 
+    # Initialize the final data structure as the first *successfully*
+    # read data output. Attempt to read the files in order until
+    # a success is found, otherwise abort since no data.
+    data_struct = {}
+    for i in range(0, n_files - 1):
+        file_i = maven_data_files[i]
+        print(file_i)
 
-    # Initialize the final data structure as the first successfully
-    # read data output.
-    maven_data_day_i = data_read_function(
-        maven_data_files[0], include_unit=include_unit, **kwargs)
-    data_struct = maven_data_day_i
+        # Skip file if empty string.
+        if not file_i:
+            continue
 
-    # Retrieve the names of all contained datasets, particulary the time axis.
-    data_names = [i for i in data_struct.keys()]
+        # Try reading the data:
+        maven_data_day_i = data_read_function(
+            file_i, include_unit=include_unit, **kwargs)
+        data_struct = maven_data_day_i
 
-    # Get the length of the time axis, which'll be used to identify timevarying
-    # data names.
-    if include_unit:
-        units = {}
-        for d in data_names:
-            data_day_i, unit_i = maven_data_day_i[d]
-            units[d] = unit_i
-            data_struct[d] = data_day_i
+        # Retrieve the names of all contained datasets,
+        # particulary the time axis.
+        data_names = [i for i in data_struct.keys()]
 
-    # print(data_names)
-    # Get the time varying axis:
-    time_axis = [i for i in data_names if "epoch" in i]
-    if len(time_axis) == 0:
-        time_axis = [d for d in data_names if "time" in d]
+        # Get the length of the time axis, which'll be used to identify timevarying
+        # data names.
+        if include_unit:
+            units = {}
+            for d in data_names:
+                data_day_i, unit_i = maven_data_day_i[d]
+                units[d] = unit_i
+                data_struct[d] = data_day_i
+
+        # print(data_names)
+        # Get the time varying axis:
+        time_axis = [i for i in data_names if "epoch" in i]
+        print(time_axis)
         if len(time_axis) == 0:
-            raise IOError("No time axis identified to concatenate, aborting.")
+            time_axis = [d for d in data_names if "time" in d]
+            if len(time_axis) == 0:
+                print(
+                    "No time axis identified in {}, moving to next...".format(file_i))
+                continue
+                # raise IOError("No time axis identified to concatenate, aborting.")
 
-    # For all time-varying axes, get the lengths:
-    n_time_0 = [len(data_struct[time_axis]) for time_axis in time_axis]
-    # print(n_time_0)
-    n_time_0, time_ax_index = np.unique(n_time_0, return_index=True)
-    time_axis = [time_axis[i] for i in time_ax_index]
-    # print(n_time_0, time_axis)
-    # input()
-
-    # Find all data with time varying axes, as these will be concatenated
-    # for multiple days
-    iterate_names = []
-    for d in data_names:
-        data_day_i = data_struct[d]
-        # print(d)
-        # print(data_day_i)
-        # print(data_day_i[:10])
-        # print(type(data_day_i))
-        # print(data_day_i.shape)
+        # For all time-varying axes, get the lengths:
+        n_time_0 = [len(data_struct[time_axis]) for time_axis in time_axis]
+        # print(n_time_0)
+        n_time_0, time_ax_index = np.unique(n_time_0, return_index=True)
+        time_axis = [time_axis[i] for i in time_ax_index]
+        # print(n_time_0, time_axis)
         # input()
-        # try:
-        data_i_d_dim = data_day_i.shape
-        # print(data_i_d_dim)
-        for n_time_i in n_time_0:
-            if n_time_i in data_i_d_dim:
-                iterate_names.append(d)
-        # except AttributeError:
-        #     continue
 
-    for i in range(1, n_files):
+        # Find all data with time varying axes, as these will be concatenated
+        # for multiple days
+        iterate_names = []
+        for d in data_names:
+            data_day_i = data_struct[d]
+            # print(d)
+            # print(data_day_i)
+            # print(data_day_i[:10])
+            # print(type(data_day_i))
+            # print(data_day_i.shape)
+            # input()
+            # try:
+            data_i_d_dim = data_day_i.shape
+            # print(data_i_d_dim)
+            for n_time_i in n_time_0:
+                if n_time_i in data_i_d_dim:
+                    iterate_names.append(d)
+            # except AttributeError:
+            #     continue
+        break
+
+    # Exit routine and raise error if absolutely no data in the files:
+    if len(data_struct) == 0:
+        raise IOError(
+            "No time axis identified in any files, so cannot be "
+            "concatenated. Aborting.")
+
+    # Iterate through remaining files:
+    start_remaining_files = i + 1
+    for i in range(start_remaining_files, n_files):
 
         # Skip file if empty string.
         if not maven_data_files[i]:
@@ -112,6 +136,16 @@ def load_data(maven_data_files, data_read_function=None,
 
         maven_data_day_i = data_read_function(
             maven_data_files[i], include_unit=False, **kwargs)
+
+        # Check if there are no time axes to append. This
+        # can happen if the files are new and telemetry isn't down
+        # for some APIDs.
+        # If so, skip to next:
+        no_time_axis_in_file = all(
+            [(t not in maven_data_day_i) for t in time_axis])
+        if no_time_axis_in_file:
+            continue
+        # if any()
 
         # Count the elements of the time axis for time-axis identification
         n_time_i = [len(maven_data_day_i[t]) for t in time_axis]
