@@ -270,6 +270,26 @@ sta_iv_name = 'mvn_sta_l2_{dataset_name}_{{yyyy}}{{mm}}{{dd}}_{iv_num}.cdf'
 sta_l3_name = "mvn_sta_l3_{short_name}_{{yyyy}}{{mm}}{{dd}}{res}_v[0-9][0-9].{ext}"
 
 
+def in_datagap(datetime_dt, data_gaps_dt):
+
+    if (data_gaps_dt[0])[0].tzinfo is None and datetime_dt.tzinfo:
+        data_gaps_dt =\
+            [(i.replace(tzinfo=dt.timezone.utc), j.replace(tzinfo=dt.timezone.utc))
+            for (i, j) in data_gaps_dt]
+
+    if datetime_dt.tzinfo is None and (data_gaps_dt[0])[0].tzinfo:
+        datetime_dt = datetime_dt.replace(tzinfo=dt.timezone.utc)
+
+    '''Function to see if a datetime datetime_dt is within
+    the data gap (should be list of datetimes)'''
+
+    test = [1 if dt_i <= datetime_dt <= dt_f else
+            0 for (dt_i, dt_f) in data_gaps_dt]
+    # print(test)
+
+    return (sum(test) > 0)
+
+
 def during_safemode(time):
     '''Function to check if a time takes place during
     safe mode.'''
