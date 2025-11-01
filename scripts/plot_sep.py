@@ -173,6 +173,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--username", help="Username to download from remote.",
         default='')
+    parser.add_argument(
+        "--password", help="Password for PFP download. "
+        "If not provided, defaults to username_pfp.")
 
     parser.add_argument(
         "--verbose", help="Enable debugging messages for retrieve.",
@@ -267,9 +270,13 @@ if __name__ == "__main__":
 
         # Username
         username = args.username
-        password = ''
-        if args.username and remote_source == "ssl_sprg":
-            password = "{}_pfp".format(username)
+        # password = ''
+        if args.password:
+            password = args.password
+
+        else:
+            if args.username and remote_source == "ssl_sprg":
+                password = "{}_pfp".format(username)
 
         retrieve.sdc_retrieve(
             'sep', destination_dir=data_directory,
