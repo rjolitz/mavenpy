@@ -97,13 +97,13 @@ if __name__ == "__main__":
 
     mag_coord, mag_ext, mag_res, mag_level = 'pl', 'sav', '30sec', 'l2'
     # for mag_ext, mag_res, mag_level in zip(('sav', 'sav'), ('30sec', '1sec'), ('l2', 'l1')):
-    #     if args.download:
-    #         retrieve.sdc_retrieve(
-    #             'mag', destination_dir=data_directory,
-    #             username=username, password=password,
-    #             ext=mag_ext, res=mag_res, level=mag_level, coord=mag_coord,
-    #             start_date=start_date, end_date=end_date)
-    #         print("MAG files updated.")
+    if args.download:
+        retrieve.sdc_retrieve(
+            'mag', destination_dir=data_directory,
+            username=username, password=password,
+            ext=mag_ext, res=mag_res, level=mag_level, coord=mag_coord,
+            start_date=start_date, end_date=end_date)
+        print("MAG files updated.")
 
     #     try:
     mag_file_names = file_path.local_file_names(
