@@ -40,7 +40,12 @@ if __name__ == "__main__":
         default=False,
     )
 
-    parser.add_argument("--username", help="Username for PFP download.")
+    parser.add_argument(
+        "--username", help="Username for PFP download.")
+    parser.add_argument(
+        "--password", help="Password for PFP download. "
+        "If not provided, defaults to username_pfp.")
+
     args = parser.parse_args()
 
     # Clean the date inputs:
@@ -58,7 +63,7 @@ if __name__ == "__main__":
             password = None
         else:
             username = args.username
-            password = "{}_pfp".format(username)
+            password = args.password if args.password else "{}_pfp".format(username)
 
     # Get the data directory:
     data_directory = args.data_directory
@@ -90,23 +95,23 @@ if __name__ == "__main__":
     # Get MAG file names / load the MAG data
     mag_coord = 'pl'
 
-    # mag_coord, mag_ext, mag_res, mag_level = 'ss', 'sts', '1sec', 'l2'
-    for mag_ext, mag_res, mag_level in zip(('sav', 'sav'), ('30sec', '1sec'), ('l2', 'l1')):
-        if args.download:
-            retrieve.sdc_retrieve(
-                'mag', destination_dir=data_directory,
-                username=username, password=password,
-                ext=mag_ext, res=mag_res, level=mag_level, coord=mag_coord,
-                start_date=start_date, end_date=end_date)
-            print("MAG files updated.")
+    mag_coord, mag_ext, mag_res, mag_level = 'pl', 'sav', '30sec', 'l2'
+    # for mag_ext, mag_res, mag_level in zip(('sav', 'sav'), ('30sec', '1sec'), ('l2', 'l1')):
+    #     if args.download:
+    #         retrieve.sdc_retrieve(
+    #             'mag', destination_dir=data_directory,
+    #             username=username, password=password,
+    #             ext=mag_ext, res=mag_res, level=mag_level, coord=mag_coord,
+    #             start_date=start_date, end_date=end_date)
+    #         print("MAG files updated.")
 
-        try:
-            mag_file_names = file_path.local_file_names(
-                data_directory, 'mag', start_date=start_date, end_date=end_date,
-                ext=mag_ext, res=mag_res, level=mag_level, coord=mag_coord,
-                source='ssl_sprg',)
-        except IOError:
-            continue
+    #     try:
+    mag_file_names = file_path.local_file_names(
+        data_directory, 'mag', start_date=start_date, end_date=end_date,
+        ext=mag_ext, res=mag_res, level=mag_level, coord=mag_coord,
+        source='ssl_sprg',)
+    #     except IOError:
+    #         continue
 
     actual_mag_files = [i for i in mag_file_names if i]
 
