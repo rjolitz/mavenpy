@@ -37,7 +37,11 @@ def load_data(maven_data_files, data_read_function=None,
     n_days: integer, >1
     data_read_function: function object'''
 
+    if isinstance(maven_data_files, str):
+        maven_data_files = (maven_data_files,)
+
     n_files = len(maven_data_files)
+    # print(n_files)
     # print(include_unit)
 
     # Figure out read function from data name
@@ -53,7 +57,7 @@ def load_data(maven_data_files, data_read_function=None,
     # read data output. Attempt to read the files in order until
     # a success is found, otherwise abort since no data.
     data_struct = {}
-    for i in range(0, n_files - 1):
+    for i in range(n_files):
         file_i = maven_data_files[i]
         print(file_i)
 
