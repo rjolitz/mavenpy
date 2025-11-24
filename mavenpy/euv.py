@@ -2,8 +2,8 @@ import os
 
 import numpy as np
 
-from .read import read_cdf
-from .helper import process_data_dict
+from .read import read_cdf, read_tplot
+from .helper import process_data_dict, UNX_to_UTC
 
 
 # EUV read routines
@@ -31,7 +31,8 @@ units = {"epoch": "utc", "time": "unx",
 column_to_field_name =\
     {"l2": {"irradiance": "data", "precision": "ddata", "accuracy": "dfreq",
             "time": "time_unix"},
-     "l3": {"time": "x", "wavelength": "v", "spectral_irradiance": "y"}}
+     "l3": {"time": "x", "wavelength": "v", "spectral_irradiance": "y"},
+     "l0": {}}
 
 # Inversion of the field name, update the units for field name mapping
 field_to_column_name = {}
@@ -95,11 +96,35 @@ def read(dataset_filename, lib='cdflib', level='', field_names="",
                 field_names = ('data', 'ddata', 'dfreq', 'flag',
                                'time_unix', 'epoch', 'maven_sun_distance',
                                'counts')
+            elif level == 'l0':
+                field_names = ("mvn_lpw_euv", "mvn_lpw_euv_temp_C")
             column_names = [field_to_column_name_i[i] if i in
                             field_to_column_name_i else i for i in field_names]
 
     # Read CDF:
-    data = read_cdf(dataset_filename, field_names, lib=lib)
+    if level == 'l0':
+        data = read_tplot(dataset_filename, return_plot_parameters=False)[0]
+        # Since tplot var, same time_unix for both fields in the
+        # file ('mvn_lpw_euv', 'mvn_lpw_euv_temp_C').
+        time_unix = data['mvn_lpw_euv']['time_unix']
+        time_utc = UNX_to_UTC(time_unix)
+        diode_currents = data["mvn_lpw_euv"]['y'] + 4.6e5
+        diode_temperature = data["mvn_lpw_euv_temp_C"]['y']
+
+        if include_unit:
+            time_unix = (time_unix, "Unix time (seconds since 1970)")
+            time_utc = (time_utc, "UTC time (datetime)")
+            diode_currents = (diode_currents, "DN")
+            diode_temperature = (diode_temperature, "C")
+
+        data_dict = {"time_unix": time_unix, "epoch": time_utc,
+                     "temperature": diode_temperature,
+                     "diode_current": diode_currents}
+
+        return data_dict
+
+    else:
+        data = read_cdf(dataset_filename, field_names, lib=lib)
 
     # Errant EUV data filled with -1 E 31
     if NaN_errant_data:

@@ -48,12 +48,13 @@ formats["acc"]["source"] = {"l3": "ssl_sprg"}
 
 # EUV
 formats["euv"] = {}
-formats["euv"]["level"] = ("l2", "l3")
-formats["euv"]["ext"] = "cdf"
+formats["euv"]["level"] = ("l0", "l2", "l3")
+formats["euv"]["ext"] = {"l0": "tplot", "l2": "cdf", "l3": "cdf"}
 formats["euv"]["datasets"] =\
-    {"l2": "bands", "l3": ("daily", "minute")}
+    {"l0": "raw", "l2": "bands", "l3": ("daily", "minute")}
 formats["euv"]["source"] =\
-    {"l2": ("ssl_sprg", "lasp_sdc_team", "lasp_sdc_public"),
+    {"l0": ("ssl_sprg",),
+     "l2": ("ssl_sprg", "lasp_sdc_team", "lasp_sdc_public"),
      "l3": ("ssl_sprg", "lasp_sdc_team", "lasp_sdc_public")}
 
 # IUVS
@@ -369,6 +370,9 @@ def path(instrument_tla, level, ext="", dataset_name="", res=""):
     if instrument_tla == "iuv":
         p = ("data", "sci", "iuv", level, dataset_name, "{yyyy}", "{mm}")
 
+    if instrument_tla == "euv" and level == 'l0':
+        p = ("data", "sci", "euv", "l0", "tplot", "{yyyy}", "{mm}")
+
     # Non-STS MAG data (variable file tree, prefer l1_sav over sav/l1 for
     # full resolution bc faster load.
     if instrument_tla == "mag" and ext != "sts":
@@ -459,6 +463,9 @@ def filename(instrument_tla, level="2", dataset_name=None, ext=None,
         if res:
             res = "_{}".format(res)
         data_name = sta_l3_name.format(short_name=short, res=res, ext=ext)
+
+    elif instrument_tla == "euv" and "l0" in level:
+        data_name = "mvn_euv_l0_{yyyy}{mm}{dd}.tplot"
 
     elif instrument_tla == 'iuv':
         # Filename for IUVS requires orbit number and orbit segment,

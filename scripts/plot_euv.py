@@ -121,18 +121,24 @@ if __name__ == "__main__":
             password = (password if password else "{}_pfp".format(username))
 
     # File check:
-    euv_ext = 'cdf'  # currently all EUV files are CDFs
     if args.download:
         print("Downloading files...")
         for level in args.level:
-            # only one dataset type for EUV L2
-            dataset_name = ('bands' if level == 'l2' else args.cadence)
+            if level == 'l2':
+                dataset_name = 'bands'
+                ext = 'cdf'
+            elif level == 'l0':
+                dataset_name = 'raw'
+                ext = 'tplot'
+            else:
+                dataset_name = args.cadence
+                ext = 'cdf'
 
             retrieve.sdc_retrieve(
                 'euv', destination_dir=data_directory,
                 username=username, password=password,
                 source=remote,
-                dataset_name=dataset_name, ext=euv_ext, level=level,
+                dataset_name=dataset_name, ext=ext, level=level,
                 start_date=start, end_date=end, verbose=args.verbose)
         print("EUV files updated.")
 
@@ -140,13 +146,21 @@ if __name__ == "__main__":
     euv_data = {}
     for level in args.level:
         # only one dataset type for EUV L2
-        dataset_name = ('bands' if level == 'l2' else args.cadence)
+        if level == 'l2':
+            dataset_name = 'bands'
+            ext = 'cdf'
+        elif level == 'l0':
+            dataset_name = 'raw'
+            ext = 'tplot'
+        else:
+            dataset_name = args.cadence
+            ext = 'cdf'
 
         # Get L2
         euv_li_files = file_path.local_file_names(
             data_directory, 'euv',
             start_date=start, end_date=end,
-            level=level, dataset_name=dataset_name, ext=euv_ext)
+            level=level, dataset_name=dataset_name, ext=ext)
         if args.verbose:
             print("For Level ", level)
             print("Files to be loaded: ")
@@ -166,6 +180,31 @@ if __name__ == "__main__":
             if "epoch" not in key and "time" not in key:
                 ax[i].plot(euv_l2["epoch"][0], euv_l2[key][0])
                 ax[i].set_ylabel(key)
+
+    # Make Level 0 plot
+    if "l0" in args.level:
+        euv_l0 = euv_data["l0"]
+
+        # Make plot of band irradiances with quality flag:
+        fig, ax = plt.subplots(
+            nrows=2, height_ratios=[0.3, 1], sharex=True, figsize=(7.5, 7))
+
+        l0_epoch = euv_l0["epoch"][0]
+        l0_T = euv_l0["temperature"][0]
+        l0_I = euv_l0["diode_current"][0]
+        l0_color = ['g', 'b', 'r', 'k']
+        diode_name = ('A', 'B', 'C', 'D')
+
+        ax[0].set_title("EUV Level 0")
+        ax[0].plot(l0_epoch, l0_T)
+        ax[0].set_ylabel("Cryodiode\ntemperature, C")
+        for i in range(4):
+            ax[1].plot(l0_epoch, l0_I[i, :], color=l0_color[i],
+                       label=diode_name[i])
+        ax[1].legend()
+        ax[1].set_ylabel("Diode current, DN")
+
+        fig.autofmt_xdate(rotation=30)
 
     # Make Level 2 plot:
     if "l2" in args.level:
@@ -189,6 +228,7 @@ if __name__ == "__main__":
         # Make plot of band irradiances with quality flag:
         fig, ax = plt.subplots(
             nrows=len(nonnan_band) + 1, sharex=True, figsize=(7.5, 7))
+        fig.autofmt_xdate(rotation=30)
 
         ax[0].set_title("EUV Level 2")
 

@@ -86,7 +86,7 @@ def load_data(maven_data_files, data_read_function=None,
         # print(data_names)
         # Get the time varying axis:
         time_axis = [i for i in data_names if "epoch" in i]
-        print(time_axis)
+        # print(time_axis)
         if len(time_axis) == 0:
             time_axis = [d for d in data_names if "time" in d]
             if len(time_axis) == 0:
