@@ -192,6 +192,8 @@ def find_local_files(local_dir, kernel_group, kernel_name,
                      ck_platform=None,
                      use_most_recent=None,
                      mirror_spedas_dir_tree=True,
+                     generic_in_local_spice_dir=False,
+                     custom_maven_kernel_dir=None,
                      verbose=None):
 
     ''' Returns local files matching a given format.
@@ -205,6 +207,19 @@ def find_local_files(local_dir, kernel_group, kernel_name,
     mirror_spedas_file_tree: boolean, True/False if searching/creating
         spice kernels in the same subdirectory where SPEDAS saves them
         (root_dir + "/misc/spice/naif/" based on spice_file_source.pro)
+    generic_in_local_spice_dir: boolean
+                                if True and mirror_spedas_dir_tree=False, 
+                                the generic_kernels folder will be taken to be 
+                                in the user's local spice directory. If False,
+                                an intermediate directory structure will be used for 
+                                generic kernels (misc/spice/naif), like this:
+                                                     |              |
+                                                     v              v
+                               /users_spice_root_dir/misc/spice/naif/generic_kernels/
+    custom_maven_kernel_dir : str or None
+                              If not None and mirror_spedas_dir_tree=False, 
+                              this string will replace 'MAVEN/kernels'. Allows
+                              unusual directory structures used by other teams.
     '''
     # print(kernel_group, kernel_name)
 
@@ -238,7 +253,7 @@ def find_local_files(local_dir, kernel_group, kernel_name,
         kernel_name_split = kernel_name_split[:-1]
     subpath = (*subpath, *kernel_name_split)
 
-    if mirror_spedas_dir_tree:
+    if mirror_spedas_dir_tree or generic_in_local_spice_dir:
         local_dir_i = os.path.join(local_dir, *subpath)
     else:
         # 2/11/25: If not mirroring SPEDAS (which keeps
@@ -247,7 +262,14 @@ def find_local_files(local_dir, kernel_group, kernel_name,
         # all MAVEN-related kernels only identified by kernel type
         # (e.g. spk, lsk), then only make a directory for that
         # subtype and save everything there.
+        # (This assumes generic_kernels is located in /local_dir/misc/spice/naif):
         local_dir_i = os.path.join(local_dir, kernel_name_split[0])
+        
+    # Handle a special case where IUVS are special snowflakes and have a
+    # different maven directory structure. --added by Eryn (IUVS team member)
+    if custom_maven_kernel_dir is not None:
+        local_dir_i = local_dir_i.replace('MAVEN/kernels', custom_maven_kernel_dir)
+    
     if verbose:
         print("Searching in:", local_dir_i)
 
@@ -489,6 +511,8 @@ def retrieve_kernels(data_directory, kernel_group, kernel_name,
                      download_if_not_available=True,
                      ck_platform=None, spk_ext='bsp',
                      use_most_recent=None, mirror_spedas_dir_tree=True,
+                     generic_in_local_spice_dir=False,
+                     custom_maven_kernel_dir=None,
                      session=None,
                      verbose=None,
                      prompt_for_download=True):
@@ -518,6 +542,8 @@ def retrieve_kernels(data_directory, kernel_group, kernel_name,
         ck_platform=ck_platform,
         use_most_recent=use_most_recent,
         mirror_spedas_dir_tree=mirror_spedas_dir_tree,
+        generic_in_local_spice_dir=generic_in_local_spice_dir,
+        custom_maven_kernel_dir=custom_maven_kernel_dir,
         verbose=verbose)
 
     local_savedir = local_info["local_dir"]
@@ -807,6 +833,8 @@ def MAVEN_kernels(data_directory, kernels, kernel_groups,
                   download_if_not_available=True,
                   session=None, verbose=None,
                   mirror_spedas_dir_tree=True,
+                  generic_in_local_spice_dir=False,
+                  custom_maven_kernel_dir=None,
                   spk_ext='bsp',
                   prompt_for_download=True):
 
@@ -852,6 +880,8 @@ def MAVEN_kernels(data_directory, kernels, kernel_groups,
             verbose=verbose,
             spk_ext=spk_ext, ck_platform=ck_platform,
             mirror_spedas_dir_tree=mirror_spedas_dir_tree,
+            generic_in_local_spice_dir=generic_in_local_spice_dir,
+            custom_maven_kernel_dir=custom_maven_kernel_dir, 
             prompt_for_download=prompt_for_download)
 
         kernel_filepath += kernel_filepath_i
@@ -867,6 +897,8 @@ def load_kernels(data_directory,
                  kernels=None,
                  download_if_not_available=True,
                  mirror_spedas_dir_tree=True,
+                 generic_in_local_spice_dir=False,
+                 custom_maven_kernel_dir=None,
                  verbose=None,
                  load_spacecraft=True,
                  load_spacecraft_pointing=True,
@@ -914,6 +946,8 @@ def load_kernels(data_directory,
         start_dt=start_dt, end_dt=end_dt,
         download_if_not_available=download_if_not_available,
         mirror_spedas_dir_tree=mirror_spedas_dir_tree,
+        generic_in_local_spice_dir=generic_in_local_spice_dir,
+        custom_maven_kernel_dir=custom_maven_kernel_dir,
         verbose=verbose,
         prompt_for_download=prompt_for_download)
 
