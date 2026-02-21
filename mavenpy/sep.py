@@ -297,6 +297,7 @@ def read_raw(filename, lib='cdflib', level='None',
         raw_data = read_sav(
             filename, struct_name=struc_names, field_names=fields,
             flatten_struct=False)
+        print(raw_data.keys())
 
         counts_var_name = "data"
         time_var_name = "time"
@@ -318,6 +319,7 @@ def read_raw(filename, lib='cdflib', level='None',
             # In this case, cannot preprocess anything:
             continue
 
+        # print(i, raw_data_i.keys())
         ctime_unx = raw_data_i[time_var_name]
         non_nan_index = (~np.isnan(ctime_unx))
         raw_data_i = process_data_dict(
@@ -327,7 +329,7 @@ def read_raw(filename, lib='cdflib', level='None',
         if level == "l1":
             raw_data_i["epoch"] = UNX_to_UTC(raw_data_i[time_var_name])
 
-        if ("svy" in dataset or "arc" in dataset) and mask_atten_actuation:
+        if ("svy" in i or "arc" in i) and mask_atten_actuation:
             # N_time x 256 bins
             raw_counts = raw_data_i[counts_var_name]
             att = raw_data_i[att_var_name]
@@ -400,46 +402,53 @@ def read_raw(filename, lib='cdflib', level='None',
 
             data_dict_i[n_lower] = raw_data_ij
 
-        if 'fto' in data_unit or "cal" in data_unit:
-            # Returns counts by FTO pattern:
-            if level == "l2":
-                sensor_num = i
-            elif level == "l1":
-                sensor_num = i[1]
+        if "svy" in i or "arc" in i:
+            if 'fto' in data_unit or "cal" in data_unit:
+                # Returns counts by FTO pattern:
+                if level == "l2":
+                    sensor_num = i
+                elif level == "l1":
+                    sensor_num = i[1]
 
-            fto_dict_i = raw_to_fto(
-                raw_data_i, level=level,
-                sensors=sensor_num,
-                raw_data_unit='counts',
-                telescope=telescopes, detector=detector,
-                output_data=output_data,
-                include_unit=include_unit)
-            # print(fto_dict_i.keys())
-            # input()
+                fto_dict_i = raw_to_fto(
+                    raw_data_i, level=level,
+                    sensors=sensor_num,
+                    raw_data_unit='counts',
+                    telescope=telescopes, detector=detector,
+                    output_data=output_data,
+                    include_unit=include_unit)
+                # print(fto_dict_i.keys())
+                # input()
 
-        if 'fto' in data_unit:
-            data_dict_i.update(fto_dict_i)
+            if 'fto' in data_unit:
+                data_dict_i.update(fto_dict_i)
 
-        if "cal" in data_unit:
-            calib_dict_i = fto_to_calibrated(
-                fto_dict_i,
-                look_directions=look_directions,
-                particle=particle,
-                output_data=output_data,
-                include_unit=include_unit)
-            data_dict_i.update(calib_dict_i)
+            if "cal" in data_unit:
+                calib_dict_i = fto_to_calibrated(
+                    fto_dict_i,
+                    look_directions=look_directions,
+                    particle=particle,
+                    output_data=output_data,
+                    include_unit=include_unit)
+                data_dict_i.update(calib_dict_i)
 
         # If pulling more than one dataset or
         # detector labeling enabled, change the key
         # to refer to the detector.
+        # print(i)
         if label_by_detector or n_datasets > 1:
             for j in data_dict_i:
-                if len(dataset) > 1:
-                    precede_str_i = i
-                else:
+                if len(dataset) == 1 and len(sensors) > 1:
                     precede_str_i = i[1]
+                elif len(dataset) > 1 and len(sensors) == 1:
+                    precede_str_i = i[3:]
+                else:
+                    precede_str_i = "{}_{}".format(i[1], i[3:])
+
                 # print(precede_str_i)
                 new_label = "{}_{}".format(precede_str_i, j)
+                # print(new_label)
+                # input()
                 data_dict[new_label] = data_dict_i[j]
         else:
             data_dict = data_dict_i
