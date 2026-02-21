@@ -181,11 +181,14 @@ def local_file_names(local_dir, instrument,
         # print(path_regex_i)
         if "(.*)" in path_regex_i:
             dir_i, file_i = os.path.split(path_regex_i)
-            local_files_i = os.listdir(dir_i)
-            matching_files =\
-                [i for i in local_files_i if re.match(re.compile(file_i), i)]
+            if os.path.exists(dir_i):
+                local_files_i = os.listdir(dir_i)
+                matching_files =\
+                    [i for i in local_files_i if re.match(re.compile(file_i), i)]
 
-            matching_files = [os.path.join(dir_i, i) for i in matching_files]
+                matching_files = [os.path.join(dir_i, i) for i in matching_files]
+            else:
+                matching_files = []
         else:
             matching_files = glob.glob(path_regex_i)
         # print(matching_files)
