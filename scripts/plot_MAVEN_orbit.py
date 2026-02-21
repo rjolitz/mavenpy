@@ -9,9 +9,11 @@ import numpy as np
 from matplotlib import cm
 from matplotlib import pyplot as plt
 from matplotlib.patches import Wedge
+import matplotlib.colors as mcolors
+import matplotlib.dates as mdates
 
 
-from mavenpy import spice, mars_shape_conics, coordinates, helper, anc
+from mavenpy import spice, mars_shape_conics, coordinates, helper, anc, plot_tools
 
 Rm = mars_shape_conics.Mars_radius
 
@@ -57,7 +59,7 @@ if __name__ == "__main__":
     # Keyword controlling # of points plotted:
     parser.add_argument(
         "--n_points",
-        help="Number of points plotted.",
+        help="Number of points plotted. Defaults to 500.",
         type=int,
         default=500,
     )
@@ -70,9 +72,21 @@ if __name__ == "__main__":
         help="Color the path by progressing time.",
         action="store_true",
     )
+    parser.add_argument(
+        "--overlay_lonalt",
+        help="Overlays longitude v altitude on lon/lat plot.",
+        action="store_true",
+    )
+
+    parser.add_argument(
+        "--path_cmap",
+        help="Color map of the path color, defaults to viridis.",
+        default='viridis'
+    )
 
     args = parser.parse_args()
 
+    n_periapse_points = 10
     default_xyzlim = [-3, 3]
     N = args.n_points
     axis_color = '0.75'
@@ -103,16 +117,18 @@ if __name__ == "__main__":
         verbose=None, spk_ext='bsp')
     # print(spice.currently_loaded_kernels())
 
-    delta_t = (end - start).total_seconds()
-    sc_time_utc =\
-        [start + dt.timedelta(seconds=(delta_t*i/N)) for i in range(N)]
+    sc_time_utc = helper.dt_range(start, end_date=end, N=N)
     x_mso, y_mso, z_mso = spice.MAVEN_position(sc_time_utc, frame="MAVEN_MSO")
     x_geo, y_geo, z_geo = spice.MAVEN_position(sc_time_utc, frame="IAU_MARS")
 
     if args.plot_path_color:
-        color_i = cm.viridis(np.linspace(0, 1, N))
-        lonalt_color_i = cm.Reds(np.linspace(0, 1, N))
-        lonlat_color_i = cm.Blues(np.linspace(0, 1, N))
+        path_cmap = plt.get_cmap(args.path_cmap)
+        color_i = path_cmap(np.linspace(0, 1, N))
+        if args.overlay_lonalt:
+            lonalt_color_i = cm.Reds(np.linspace(0, 1, N))
+            lonlat_color_i = cm.Blues(np.linspace(0, 1, N))
+        else:
+            lonlat_color_i = color_i
     else:
         color_i = 'g'
         lonalt_color_i = 'r'
@@ -123,7 +139,9 @@ if __name__ == "__main__":
         x_geo, y_geo, z_geo)
 
     # Get the periapse indices:
-    below_alt = np.where(alt < 200)[0]
+    below_alt = np.where(alt < 250)[0]
+    print('Min alt: {} km, max alt: {} km'.format(np.min(alt), np.max(alt)))
+    # input()
     # print(below_alt)
     alt_edges = np.where(np.abs(np.ediff1d(below_alt)) > 1)[0]
     # print(alt_edges)
@@ -136,10 +154,12 @@ if __name__ == "__main__":
         # print(below_alt[a_l:a_h])
         # print(alt_lh)
         periapse_i = below_alt[a_l] + np.argmin(alt_lh)
+        # print(periapse_i)
         periapse_index.append(periapse_i)
         # print(alt[below_alt[alt_edges]])
 
-    # print(periapse_index)
+    print('Periapse index: ', periapse_index)
+    print('# periapse: ', len(periapse_index))
     # input()
 
     # mso_spline = mars_shape_conics.cartesian_spline(
@@ -216,7 +236,8 @@ if __name__ == "__main__":
     # ax_l = fig.add_subplot(gs[1:, 1:])
     ax_l = fig.add_subplot(gs01[:, 0])
     ax_r = fig.add_subplot(gs01[:, 1])
-    ax_r2 = ax_r.twinx()
+    if args.overlay_lonalt:
+        ax_r2 = ax_r.twinx()
 
     # The rho plot:
     rho_bs = np.sqrt(z_bs ** 2 + y_bs ** 2)
@@ -238,6 +259,7 @@ if __name__ == "__main__":
     ax_l.set_ylabel("ρ [√($Y^2$ + $Z^2$)], Rm")
     ax_l.set_facecolor(axis_color)
 
+
     # Lon / Lat
 
     # Longitude wrapping from 0 to 360 appears as horizontal bars.
@@ -245,19 +267,28 @@ if __name__ == "__main__":
     wrapped_indices = np.where(np.abs(np.ediff1d(lon)) > 180)[0]
     wrapped_indices = np.append(wrapped_indices, len(lon) - 1)
 
-    ax_r.scatter(
-        lon[periapse_index], lat[periapse_index],
-        color=lonlat_color_i, marker='x', zorder=10)
-    ax_r2.scatter(
-        lon[periapse_index], alt[periapse_index],
-        color=lonalt_color_i, marker='x', zorder=10)
+    if len(periapse_index) < n_periapse_points:
+        if isinstance(lonlat_color_i, str):
+            periapse_color = lonlat_color_i
+        else:
+            periapse_color = lonlat_color_i[periapse_index]
+
+        ax_r.scatter(
+            lon[periapse_index], lat[periapse_index],
+            color=periapse_color, marker='x', zorder=10)
+        if args.overlay_lonalt:
+            ax_r2.scatter(
+                lon[periapse_index], alt[periapse_index],
+                color=periapse_color, marker='x', zorder=10)
 
     # plt.show()
 
     # input()
     if len(wrapped_indices) == 0:
         ax_r.scatter(lon, lat, color=lonlat_color_i, s=3, marker='.', zorder=2)
-        ax_r2.scatter(lon, alt, color=lonalt_color_i, s=3, marker='.', zorder=2)
+        if args.overlay_lonalt:
+            ax_r2.scatter(
+                lon, alt, color=lonalt_color_i, s=3, marker='.', zorder=2)
     else:
         init_index = 0
         for wrap_index in wrapped_indices:
@@ -266,14 +297,23 @@ if __name__ == "__main__":
             alt_i = alt[init_index:(wrap_index + 1)]
 
             if args.plot_path_color:
-                lonalt_color_j = lonalt_color_i[init_index:(wrap_index + 1)]
                 lonlat_color_j = lonlat_color_i[init_index:(wrap_index + 1)]
-                ax_r.scatter(lon_i, lat_i, color=lonlat_color_j, s=3, marker='.', zorder=2)
-                ax_r2.scatter(lon_i, alt_i, color=lonalt_color_j, s=3, marker='.', zorder=2)
+                ax_r.scatter(
+                    lon_i, lat_i, color=lonlat_color_j,
+                    s=3, marker='.', zorder=2)
+                if args.overlay_lonalt:
+                    lonalt_color_j = lonalt_color_i[init_index:(wrap_index + 1)]
+                    ax_r2.scatter(
+                        lon_i, alt_i, color=lonalt_color_j,
+                        s=3, marker='.', zorder=2)
 
             else:
-                ax_r.scatter(lon_i, lat_i, c=lonlat_color_i, s=3, marker='.', zorder=2)
-                ax_r2.scatter(lon_i, alt_i, c=lonalt_color_i, s=3, marker='.', zorder=2)
+                ax_r.scatter(
+                    lon_i, lat_i, c=lonlat_color_i, s=3, marker='.', zorder=2)
+                if args.overlay_lonalt:
+                    ax_r2.scatter(
+                        lon_i, alt_i, c=lonalt_color_i,
+                        s=3, marker='.', zorder=2)
             init_index = wrap_index + 1
 
     ax_r.set_aspect('equal')
@@ -282,14 +322,17 @@ if __name__ == "__main__":
     ax_r.set_ylim([-90, 90])
     ax_r.set_xticks([60 * i for i in range(7)])
     ax_r.set_xlabel("East Longitude, deg.")
-    ax_r.set_ylabel("Latitude, deg.", color='b')
-    ax_r2.set_ylabel("Altitude, km", color='r')
+    if args.overlay_lonalt:
+        ax_r2.set_ylabel("Altitude, km", color='r')
+        ax_r.set_ylabel("Latitude, deg.", color='b')
+    else:
+        ax_r.set_ylabel("Latitude, deg.")
     ax_r.set_facecolor(axis_color)
 
     fig.tight_layout()
 
     if args.plot_b:
-        plot_b_file = "/Users/rjolitz/Downloads/Morschhauser_spc_dlat0.25_delon0.25_dalt5.sav"
+        plot_b_file = "/Users/rjolitz/DataFiles/from_others/Morschhauser_spc_dlat0.25_delon0.25_dalt5.sav"
         b_struct = readsav(plot_b_file)['morschhauser']
 
         r = b_struct['radius'][0]
@@ -312,5 +355,43 @@ if __name__ == "__main__":
 
         ax_r.contourf(lon, lat, br, vmin=-40, vmax=40, cmap=cm.RdBu, zorder=1)
         # plt.colorbar(label='Br, nT')
+
+
+    if args.plot_path_color:
+
+        # Get bounding box that marks the boundaries of the axis:
+        # [x0 (left), y0 (bottom), x1 (right), y1 (top)] of the axis.
+        ax_l_pos = ax_l.get_position()
+        ax_r_pos = ax_r.get_position()
+        new_ax_l_pos =\
+            [ax_l_pos.x0, ax_r_pos.y0, ax_l_pos.width, ax_l_pos.height]
+        ax_l.set_position(new_ax_l_pos)
+
+        norm_t = mcolors.Normalize(
+            vmin=mdates.date2num(sc_time_utc[0]),
+            vmax=mdates.date2num(sc_time_utc[-1]))
+        im = cm.ScalarMappable(norm=norm_t, cmap='viridis')
+
+        # [left most position, bottom position, width, height] of color bar.
+        # cax = fig.add_axes(
+        #     [bbox.x1 - 0.02, bbox.y0, 0.05, bbox.height])
+        # cax = fig.add_axes(
+        #     [bbox.x0, bbox.y0 - 0.2, bbox.width, 0.01])
+        if args.overlay_lonalt:
+            cax = fig.add_axes(
+                [ax_l_pos.x0, ax_r_pos.y1 - 0.03, ax_l_pos.width, 0.03])
+        else:
+            cax = fig.add_axes(
+                [ax_l_pos.x0, ax_l_pos.y1 + 0.04, ax_l_pos.width, 0.02])
+
+        rho_cbar = fig.colorbar(im, cax=cax, orientation='horizontal')
+
+        rho_loc = mdates.AutoDateLocator()
+        rho_fmt = mdates.ConciseDateFormatter(rho_loc)
+        rho_cbar.ax.xaxis.set_major_locator(rho_loc)
+        rho_cbar.ax.xaxis.set_major_formatter(rho_fmt)
+        # rho_cbar.ax.xaxis.set_offset_position('bottom')
+        # rho_cbar.ax.yaxis.set_major_formatter(
+        #     mdates.AutoDateFormatter(rho_loc))
 
     plt.show()
