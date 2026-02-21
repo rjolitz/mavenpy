@@ -53,7 +53,7 @@ if __name__ == "__main__":
 
     # Level of data to access:
     parser.add_argument(
-        "--level", help="Level of MAVEN EUV data (l2 or l3)",
+        "--level", help="Level of MAVEN EUV data (l0, l2, or l3)",
         type=str, nargs="+",
         default=('l2',)
     )
@@ -63,6 +63,12 @@ if __name__ == "__main__":
              " Defaults to minute.",
         type=str,
         default='minute'
+    )
+    parser.add_argument(
+        "--no_clock_correction",
+        help="Deactivates the spacecraft clock correction.",
+        default=False,
+        action='store_true',
     )
 
     # Remote/download args:
@@ -92,6 +98,9 @@ if __name__ == "__main__":
         action="store_true")
     parser.add_argument(
         "--compare_l2_l3", help="Make plot comparing level 2 and 3.",
+        action="store_true")
+    parser.add_argument(
+        "--compare_l0_l2", help="Make plot comparing level 0 and 2.",
         action="store_true")
 
     args = parser.parse_args()
@@ -165,7 +174,10 @@ if __name__ == "__main__":
             print("For Level ", level)
             print("Files to be loaded: ")
             print(euv_li_files)
-        euv_li = load.load_data(euv_li_files, include_unit=True)
+        euv_li = load.load_data(
+            euv_li_files, include_unit=True,
+            spice_kernel_dir=data_directory,
+            clock_drift_correction=(not args.no_clock_correction))
         euv_data[level] = euv_li
 
     # Show all Level 2 data:
@@ -205,6 +217,17 @@ if __name__ == "__main__":
         ax[1].set_ylabel("Diode current, DN")
 
         fig.autofmt_xdate(rotation=30)
+
+        if args.compare_l0_l2:
+            comp_fig, comp_ax = plt.subplots(
+                nrows=4, sharex=True, figsize=(7.5, 7))
+            for i in range(4):
+                comp_ax[0].plot(
+                    l0_epoch, l0_I[i, :], color=l0_color[i],
+                    label=diode_name[i])
+            comp_ax[0].legend()
+            comp_ax[0].set_ylabel("Diode current, DN")
+            comp_ax[0].set_yscale('log')
 
     # Make Level 2 plot:
     if "l2" in args.level:
@@ -257,6 +280,38 @@ if __name__ == "__main__":
 
             ax[plot_index].set_ylabel(
                 "Irradiance\n{}\n{}".format(band_i, irradiance_unit))
+
+
+        if args.compare_l0_l2:
+
+            for flag_i in range(len(l2_flag_names) - 1, -1, -1):
+                index_i = np.where(l2_flag == flag_i)[0]
+                comp_ax[-1].scatter(
+                    l2_epoch[index_i], l2_flag[index_i],
+                    marker='.', color=l2_flag_colors[flag_i],
+                    label=l2_flag_names[flag_i])
+            # ax[-1].set_ylabel("Flag")
+            comp_ax[-1].set_yticks([i for i in range(8)])
+            comp_ax[-1].set_yticklabels(l2_flag_names, rotation=30)
+            # ax[-1].yaxis.set_label_position("right")
+            # ax[-1].yaxis.tick_right()
+
+            for plot_index, band_i in enumerate(nonnan_band):
+                plot_index = plot_index + 1
+                i = l2_bands.index(band_i)
+
+                for flag_i in range(len(l2_flag_names) - 1, -1, -1):
+
+                    index_i = np.where(l2_flag == flag_i)[0]
+
+                    comp_ax[plot_index].scatter(
+                        l2_epoch[index_i], l2_irradiance[index_i, i],
+                        marker='.', color=l2_flag_colors[flag_i])
+
+                comp_ax[plot_index].set_ylabel(
+                    "Irradiance\n{}\n{}".format(band_i, irradiance_unit))
+
+
 
     # Get L3
     if "l3" in args.level:
