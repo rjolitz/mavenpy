@@ -1,9 +1,11 @@
 import os
 
 import numpy as np
+import spiceypy
 
 from .read import read_cdf, read_tplot
-from .helper import process_data_dict, UNX_to_UTC
+from .helper import process_data_dict, UTC_to_UNX, UNX_to_UTC
+from .spice import retrieve_kernels
 
 
 # EUV read routines
@@ -45,7 +47,9 @@ for level in column_to_field_name:
 
 def read(dataset_filename, lib='cdflib', level='', field_names="",
          column_names="", include_unit=True, relabel_columns=True,
-         NaN_errant_data=True):
+         NaN_errant_data=True,
+         lsk_file_path="", sclk_file_path="", spice_kernel_dir="",
+         clock_drift_correction=True):
 
     """Loads daily files of EUV Level 3 and 2 data.
 
@@ -106,8 +110,56 @@ def read(dataset_filename, lib='cdflib', level='', field_names="",
         data = read_tplot(dataset_filename, return_plot_parameters=False)[0]
         # Since tplot var, same time_unix for both fields in the
         # file ('mvn_lpw_euv', 'mvn_lpw_euv_temp_C').
-        time_unix = data['mvn_lpw_euv']['time_unix']
-        time_utc = UNX_to_UTC(time_unix)
+
+        # WARNING: time_unix is NOT CORRECTED for clock drift,
+        # Need to convert back to MET_uncorrected and then use Spice
+        # to get correct unix time (~400 sec off)
+        time_unix_uncorr = data['mvn_lpw_euv']['time_unix']
+
+        if clock_drift_correction:
+
+            # Check if any Spice kernels loaded:
+            if spiceypy.ktotal('ALL') < 2:
+
+                if not lsk_file_path and not sclk_file_path:
+                    if not spice_kernel_dir:
+                        raise IOError(
+                            "Require a directory with Spice kernels "
+                            "to download/access for ET correction.")
+                    lsk_file_path = retrieve_kernels(
+                        spice_kernel_dir, 'generic_kernels',
+                        'lsk', use_most_recent=True)
+                    sclk_file_path = retrieve_kernels(
+                        spice_kernel_dir, 'maven',
+                        'sclk', use_most_recent=True)
+                # Furnsh the kernels (will be cached
+                # for subsequent days, if further loaded:)
+                for k in [lsk_file_path, sclk_file_path]:
+                    spiceypy.furnsh(k)
+
+            # UNIX_uncorrected = MET_uncorrected + 2000-01-01/12:00:00
+            # (sec since 1970)
+            met_uncorr = time_unix_uncorr - (946771200 - 12*3600)
+
+            # The onboard clock is formatted as strings
+            # with format "SSSSSSSSSS.FFFFF", where SSSSSSSSSS is
+            # onboard seconds and FFFFF is the fractions of a tick
+            # s.t. 1 fraction = 1/65536 of a second
+            abs_sec = np.floor(met_uncorr)
+            frac_ticks = np.round((met_uncorr % 1)*65536)
+
+            sclk_uncorr =\
+                ["{onboard_sec}:{ticks}".format(
+                    onboard_sec=int(i), ticks=int(j))
+                 for (i, j) in zip(abs_sec, frac_ticks)]
+            # print(sclk_uncorr[:3])
+            et_corr = [spiceypy.scs2e(-202, i) for i in sclk_uncorr]
+            time_utc = np.array([spiceypy.et2datetime(i) for i in et_corr])
+            time_unix = UTC_to_UNX(time_utc)
+        else:
+            time_unix = time_unix_uncorr
+            time_utc = UNX_to_UTC(time_unix)
+
         diode_currents = data["mvn_lpw_euv"]['y'] + 4.6e5
         diode_temperature = data["mvn_lpw_euv_temp_C"]['y']
 
