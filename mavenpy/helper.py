@@ -343,21 +343,25 @@ def sanitize_date_inputs(start_date=None, n_days=None, end_date=None,
 
 def dt_range(start_date, n_days=None, end_date=None,
              cadence=None, cadence_unit=None,
-             n_points_per_day=None):
-    '''
+             n_points_per_day=None, N=None):
+    '''Make the datetime range between start and end date
+    cadence: # of increments in cadence_unit
+    cadence_unit: string, unit of cadence e.g. hr or min
     n_points_per_day: ex. 2
+    N: total number of points in range [start_date, end_date]
     '''
 
     # Need either a cadence + cadence_unit OR
     # a n_points_per_day
-    if not cadence and not n_points_per_day:
+    if not any((cadence, n_points_per_day, N)):
         raise ValueError(
-            "make_dt_range needs either a cadence (e.g. 1) "
-            "and cadence_unit (e.g. 'hr') OR a n_points_per_day"
-            " (e.g. 2). Neither supplied.")
-    if cadence and not cadence_unit:
+            "dt_range needs either a cadence (e.g. 1) "
+            "and cadence_unit (e.g. 'hr'), n_points_per_day"
+            " (e.g. 2), or N total points (e.g. 10). "
+            "None supplied.")
+    elif cadence and not cadence_unit:
         raise ValueError(
-            "If supplying a cadence, make_dt_range needs a "
+            "If supplying a cadence, dt_range needs a "
             "cadence_unit (e.g. 'hr').")
 
     # Convert start/end/n_days to appropriate datetype
@@ -415,6 +419,12 @@ def dt_range(start_date, n_days=None, end_date=None,
         for (i, j) in itertools.product(days, delta_t):
             t.append(i + j)
         # dt_range = [(i + j) ]
+
+    if N:
+        duration = (end_date_dt - start_date_dt).total_seconds()
+        delta_t = duration/(N - 1)
+        t = [start_date_dt + dt.timedelta(seconds=delta_t*i)
+             for i in range(N)]
 
     return t
 
