@@ -393,7 +393,7 @@ def dt_range(start_date, n_days=None, end_date=None,
         elif cadence_unit in ("day", "weeks", "year"):
             if cadence_unit == 'year':
                 duration_d = cadence*365
-            elif cadence_unit == 'days':
+            elif cadence_unit == 'day':
                 duration_d = cadence
             elif cadence_unit == 'weeks':
                 duration_d = cadence*7
