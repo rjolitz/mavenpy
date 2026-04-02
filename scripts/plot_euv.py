@@ -196,25 +196,37 @@ if __name__ == "__main__":
     # Make Level 0 plot
     if "l0" in args.level:
         euv_l0 = euv_data["l0"]
+        l0_epoch = euv_l0["epoch"][0]
+        l0_I = euv_l0["diode_current"][0]
+
+        nrows = 1
+        hr = [1,]
+        if "temperature" in euv_l0:
+            nrows += 1
+            l0_T = euv_l0["temperature"][0]
+            hr = [0.3, 1]
 
         # Make plot of band irradiances with quality flag:
         fig, ax = plt.subplots(
-            nrows=2, height_ratios=[0.3, 1], sharex=True, figsize=(7.5, 7))
+            nrows=nrows, height_ratios=hr, sharex=True, figsize=(7.5, 7))
 
-        l0_epoch = euv_l0["epoch"][0]
-        l0_T = euv_l0["temperature"][0]
-        l0_I = euv_l0["diode_current"][0]
         l0_color = ['g', 'b', 'r', 'k']
         diode_name = ('A', 'B', 'C', 'D')
 
-        ax[0].set_title("EUV Level 0")
-        ax[0].plot(l0_epoch, l0_T)
-        ax[0].set_ylabel("Cryodiode\ntemperature, C")
+        if "temperature" in euv_l0:
+            ax[0].plot(l0_epoch, l0_T)
+            ax[0].set_ylabel("Cryodiode\ntemperature, C")
+            ax[0].set_title("EUV Level 0")
+            ax_d = ax[1]
+        else:
+            ax.set_title("EUV Level 0")
+            ax_d = ax
+
         for i in range(4):
-            ax[1].plot(l0_epoch, l0_I[i, :], color=l0_color[i],
-                       label=diode_name[i])
-        ax[1].legend()
-        ax[1].set_ylabel("Diode current, DN")
+            ax_d.plot(l0_epoch, l0_I[i, :], color=l0_color[i],
+                      label=diode_name[i])
+        ax_d.legend()
+        ax_d.set_ylabel("Diode current, DN")
 
         fig.autofmt_xdate(rotation=30)
 

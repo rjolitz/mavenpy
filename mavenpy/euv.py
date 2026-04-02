@@ -161,17 +161,20 @@ def read(dataset_filename, lib='cdflib', level='', field_names="",
             time_utc = UNX_to_UTC(time_unix)
 
         diode_currents = data["mvn_lpw_euv"]['y'] + 4.6e5
-        diode_temperature = data["mvn_lpw_euv_temp_C"]['y']
 
         if include_unit:
             time_unix = (time_unix, "Unix time (seconds since 1970)")
             time_utc = (time_utc, "UTC time (datetime)")
             diode_currents = (diode_currents, "DN")
-            diode_temperature = (diode_temperature, "C")
 
         data_dict = {"time_unix": time_unix, "epoch": time_utc,
-                     "temperature": diode_temperature,
                      "diode_current": diode_currents}
+
+        if "mvn_lpw_euv_temp_C" in data:
+            diode_temperature = data["mvn_lpw_euv_temp_C"]['y']
+            if include_unit:
+                diode_temperature = (diode_temperature, "C")
+            data_dict["temperature"] = diode_temperature
 
         return data_dict
 
