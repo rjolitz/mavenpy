@@ -1,13 +1,14 @@
 import datetime as dt
 import argparse
 import sys
+from collections.abc import Iterable
 
 import numpy as np
 from dateutil.parser import parse
 from matplotlib import pyplot as plt
 from matplotlib.colors import LogNorm, Normalize, ListedColormap
 
-from mavenpy import file_path, load, retrieve, plot_tools, helper
+from mavenpy import file_path, load, retrieve, plot_tools, helper, spice, mars_shape_conics, anc
 
 
 if __name__ == "__main__":
@@ -74,6 +75,7 @@ if __name__ == "__main__":
         help="Argument to exclude attenuator if activated.",
         action="store_true"
     )
+    parser.add_argument("--alt", help="Show altitude plot", action='store_true')
 
     # Data type to plot as:
     parser.add_argument(
@@ -318,6 +320,40 @@ if __name__ == "__main__":
                     sensor_i))
             sys.exit()
 
+    # Load the spacecraft info, if plotting the altitude
+    if args.alt:
+        # Plot the altitude:
+        dl_kernels = False
+        # Retrieve orbit ephemeris for this time period
+        k = spice.load_kernels(
+            args.data_directory,
+            start_date=start, end_date=end,
+            download_if_not_available=dl_kernels,
+            verbose=False,
+            prompt_for_download=False)
+        # input("Kernels loaded, hit return to continue:")
+
+        eph = anc.read_orbit_ephemeris(
+            args.data_directory,
+            start_date=start, end_date=end,
+            download_if_not_available=dl_kernels)
+        # input("Loaded ephemeris, hit return to continue:")
+
+        sc_time_utc = helper.dt_range(
+            start, end_date=end,
+            n_points_per_day=1000)
+
+        sc_x, sc_y, sc_z = spice.MAVEN_position(sc_time_utc)
+        sc_time_utc = np.array(sc_time_utc)
+        sc_r = np.sqrt(sc_x**2 + sc_y**2 + sc_z**2)
+        sc_alt = sc_r - 3390
+
+        print(sc_alt)
+
+        alt2 = mars_shape_conics.region_separation(
+            sc_x, sc_y, sc_z, sc_alt)
+        c = {"sw": "k", "pileup": "orange", "shadow": "b", "sheath": "limegreen"}
+
     # Load the data:
     if level == 'l1':
         sep_all = load.load_data(
@@ -332,12 +368,20 @@ if __name__ == "__main__":
         sep_dict = {}
         for sensor_i in sensors:
             # Get all keys starting with that sensor name
-            preceding_str = "{}_".format(sensor_i)
+            if len(sensors) == 1:
+                preceding_str = "{}_svy_".format(sensor_i)
+            else:
+                preceding_str = "{}_".format(sensor_i)
             matching_keys_i = [i for i in sep_keys if preceding_str in i]
+            # print(preceding_str)
+            # print(matching_keys_i)
+            # input()
             shortened_key_i = [i.split(preceding_str)[1] for i in matching_keys_i]
             sep_dict[sensor_i] = {}
             for old_key, new_key in zip(matching_keys_i, shortened_key_i):
                 sep_dict[sensor_i][new_key] = sep_all[old_key]
+            # print(shortened_key_i)
+            # input()
     else:
         sep_dict = {}
         for sensor_i in sensors:
@@ -376,6 +420,11 @@ if __name__ == "__main__":
         height_ratios = n_sensors * ([1] * n_x_plot * n_y_plot + [atten_plot_height])
         n_plots += n_sensors
 
+    if args.alt:
+        n_plots += 1
+        height_ratios += [0.5]
+
+
     # fig_height = max(min(
     #     n_sensors*(1*n_x_plot * n_y_plot + atten_plot_height) * 1, 8), 4)
     fig_height = max(min(sum(height_ratios), 8), 4)
@@ -392,8 +441,30 @@ if __name__ == "__main__":
     elif args.plot == 'line':
         plt.subplots_adjust(top=0.95, right=0.95, wspace=0, hspace=0)
 
+    if args.alt:
+        # Get orbit info
+        orbnum = eph["orbnum"]
+        utc = eph["periapse_utc"]
+        unx = helper.UTC_to_UNX(utc)
+        # ax[i].plot(sc_time_utc, sc_alt, color='gray')
+        for region in alt2:
+            ax[-1].plot(
+                sc_time_utc, alt2[region], label=region, color=c[region])
+        # ax[-1].legend()
+
+        # ax[i].plot(sc_time_utc, sheath_alt, color='lightgreen', label='sheath')
+        # ax[i].plot(sc_time_utc, pileup_alt, color='orange', label='pileup')
+        # ax[i].plot(sc_time_utc, sw_alt, color='k', label='SW')
+        # ax[i].plot(sc_time_utc, shadow_alt, color='b', label='Shadow')
+        ax[-1].set_ylabel(
+            "Alt., km", rotation='horizontal', va='center', labelpad=35)
+        regions = list(alt2.keys())
+        plot_tools.legend_sidetext(fig, ax[-1], regions, colors=[c[i] for i in regions], ax_pad=0.01)
+        # plt.show()
+
     for sensor_index, sensor_i in enumerate(sensors):
         sep_i = sep_dict[sensor_i]
+        # print()
 
         # Retrieve time:
         time_i = sep_i["time_unix"]
@@ -431,7 +502,11 @@ if __name__ == "__main__":
                 plot_index =\
                     index_x*n_y_plot + index_y +\
                     sensor_index*(n_x_plot*n_y_plot + 1)
-                ax_i = ax[plot_index]
+
+                if isinstance(ax, Iterable):
+                    ax_i = ax[plot_index]
+                else:
+                    ax_i = ax
 
                 if args.plot == "spectra":
                     p = ax_i.pcolormesh(
@@ -492,7 +567,7 @@ if __name__ == "__main__":
 
     # ax[0].xaxis.set_major_locator(mdates.HourLocator(byhour=[0, 12,]))
     # ax[0].xaxis.set_minor_locator(mdates.HourLocator(byhour=[0, 4, 8, 12, 16, 20]))
-    ax[0].xaxis.set_major_formatter(mdates.DateFormatter('%m-%d\n%H:%M:%S'))
+    # ax[0].xaxis.set_major_formatter(mdates.DateFormatter('%m-%d\n%H:%M:%S'))
 
     # if start_date == end_date:
     if not args.xlim:
@@ -504,6 +579,18 @@ if __name__ == "__main__":
         start_x = parse(start_x)
         end_x = parse(end_x)
 
-    ax[0].set_xlim([start_x, end_x])
+    if isinstance(ax, Iterable):
+        ax0 = ax[0]
+    else:
+        ax0 = ax
+
+    ax0.set_xlim([start_x, end_x])
+
+    loc = mdates.AutoDateLocator()
+    fmt = mdates.ConciseDateFormatter(loc)
+    ax0.xaxis.set_major_locator(loc)
+    ax0.xaxis.set_major_formatter(fmt)
+
+    # fig.savefig('/Users/rjolitz/Desktop/f.png', dpi=800)
 
     plt.show()
